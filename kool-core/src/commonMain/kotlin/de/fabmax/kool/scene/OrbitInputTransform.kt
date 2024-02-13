@@ -81,6 +81,8 @@ open class OrbitInputTransform(name: String? = null) : Node(name), InputStack.Po
     private var deltaScroll = 0.0
 
     private val ptrPos = MutableVec2d()
+    private val ptrPosInitial = MutableVec2d(Vec2d.ZERO)
+
     private val panPlane = Plane()
     private val pointerHitStart = MutableVec3f()
     private val pointerHit = MutableVec3f()
@@ -193,8 +195,14 @@ open class OrbitInputTransform(name: String? = null) : Node(name), InputStack.Po
         }
 
         if (dragMethod == DragMethod.ROTATE) {
-            verticalRotation -= deltaPos.x / 3 * if (invertRotX) { -1f } else { 1f }
-            horizontalRotation -= deltaPos.y / 3 * if (invertRotY) { -1f } else { 1f }
+            if(ptrPosInitial != Vec2d.ZERO){
+                verticalRotation -= ( ptrPosInitial.x-ptrPos.x) / 3 * if (invertRotX) { -1f } else { 1f }
+                horizontalRotation -= ( ptrPosInitial.y-ptrPos.y) / 3 * if (invertRotY) { -1f } else { 1f }
+                ptrPosInitial.set(Vec2d.ZERO)
+            }else{
+                verticalRotation -= deltaPos.x / 3 * if (invertRotX) { -1f } else { 1f }
+                horizontalRotation -= deltaPos.y / 3 * if (invertRotY) { -1f } else { 1f }
+            }
             horizontalRotation = horizontalRotation.clamp(minHorizontalRot, maxHorizontalRot)
             deltaPos.set(Vec2d.ZERO)
         }
@@ -258,6 +266,10 @@ open class OrbitInputTransform(name: String? = null) : Node(name), InputStack.Po
                 else -> DragMethod.NONE
             }
             dragStart = dragMethod != DragMethod.NONE
+
+            if(dragMethod == DragMethod.ROTATE){
+                ptrPosInitial.set(dragPtr.x, dragPtr.y)
+            }
         }
 
         prevButtonMask = dragPtr.buttonMask

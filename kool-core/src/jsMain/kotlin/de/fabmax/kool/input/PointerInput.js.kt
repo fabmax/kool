@@ -3,7 +3,7 @@ package de.fabmax.kool.input
 import de.fabmax.kool.JsImpl
 import de.fabmax.kool.KoolSystem
 import de.fabmax.kool.configJs
-import de.fabmax.kool.math.MutableVec2d
+import de.fabmax.kool.math.*
 import de.fabmax.kool.platform.JsContext
 import de.fabmax.kool.platform.TouchEvent
 import de.fabmax.kool.platform.elementX
@@ -12,8 +12,7 @@ import de.fabmax.kool.util.logI
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.HTMLCanvasElement
-import org.w3c.dom.events.KeyboardEvent
-import org.w3c.dom.events.MouseEvent
+import org.w3c.dom.events.*
 
 internal actual fun PlatformInput(): PlatformInput = PlatformInputJs
 
@@ -47,6 +46,11 @@ internal object PlatformInputJs : PlatformInput {
         installInputHandlers(ctx.canvas)
     }
 
+    private fun Event.asTouchEvent(): TouchEvent? {
+        return if (this is TouchEvent) this
+        else null
+    }
+
     @Suppress("UNUSED_PARAMETER")
     private fun pointerMovementX(ev: MouseEvent) = js("ev.movementX") as Double * window.devicePixelRatio
 
@@ -54,20 +58,50 @@ internal object PlatformInputJs : PlatformInput {
     private fun pointerMovementY(ev: MouseEvent) = js("ev.movementY") as Double * window.devicePixelRatio
 
     private fun installInputHandlers(canvas: HTMLCanvasElement) {
+
+        var isTouchActive = false
+
+        fun Event.buildTouchPosition(): Vec2d? {
+            preventDefault()
+            return with(canvas.getBoundingClientRect()) {
+                asTouchEvent()?.let { touch ->
+                    if (touch.changedTouches.length == 0) null
+                    else {
+                        val item = touch.changedTouches.item(0)
+                        Vec2d(
+                            item.elementX * window.devicePixelRatio - left,
+                            item.elementY * window.devicePixelRatio - top
+                        )
+                    }
+                }
+            }
+        }
+
+        fun Event.invokeMoveTouchAsMouse() {
+            buildTouchPosition()?.also {
+                virtualPointerPos.x = it.x
+                virtualPointerPos.y = it.y
+                PointerInput.handleMouseMove(virtualPointerPos.x, virtualPointerPos.y)
+            }
+        }
+
         // install mouse handlers
         canvas.onmousemove = { ev ->
-            val bounds = canvas.getBoundingClientRect()
-            if (PointerLockState.hasPointerLock) {
-                // on active pointer lock, mouse event position is constant and only deltas are reported
-                //  -> use deltas to compute a virtual unbounded pointer position
-                virtualPointerPos.x += pointerMovementX(ev)
-                virtualPointerPos.y += pointerMovementY(ev)
-            } else {
-                virtualPointerPos.x = (ev.clientX * window.devicePixelRatio - bounds.left)
-                virtualPointerPos.y = (ev.clientY * window.devicePixelRatio - bounds.top)
+            if (!isTouchActive) {
+                val bounds = canvas.getBoundingClientRect()
+                if (PointerLockState.hasPointerLock) {
+                    // on active pointer lock, mouse event position is constant and only deltas are reported
+                    //  -> use deltas to compute a virtual unbounded pointer position
+                    virtualPointerPos.x += pointerMovementX(ev)
+                    virtualPointerPos.y += pointerMovementY(ev)
+                } else {
+                    virtualPointerPos.x = (ev.clientX * window.devicePixelRatio - bounds.left)
+                    virtualPointerPos.y = (ev.clientY * window.devicePixelRatio - bounds.top)
+                }
+                PointerInput.handleMouseMove(virtualPointerPos.x, virtualPointerPos.y)
             }
-            PointerInput.handleMouseMove(virtualPointerPos.x, virtualPointerPos.y)
         }
+
         canvas.onmousedown = { ev ->
             PointerLockState.checkLockState()
             val changeMask = ev.buttons.toInt() and mouseButtonState.inv()
@@ -106,34 +140,37 @@ internal object PlatformInputJs : PlatformInput {
         // install touch handlers
         canvas.addEventListener("touchstart", { ev ->
             ev.preventDefault()
-            val changedTouches = (ev as TouchEvent).changedTouches
-            for (i in 0 until changedTouches.length) {
-                val touch = changedTouches.item(i)
-                PointerInput.handleTouchStart(touch.identifier, touch.elementX, touch.elementY)
-            }
+            isTouchActive = true
+            ev.invokeMoveTouchAsMouse()
+            PointerInput.handleMouseButtonEvent(0, true)
         }, false)
+
         canvas.addEventListener("touchend", { ev ->
             ev.preventDefault()
-            val changedTouches = (ev as TouchEvent).changedTouches
-            for (i in 0 until changedTouches.length) {
-                val touch = changedTouches.item(i)
-                PointerInput.handleTouchEnd(touch.identifier)
-            }
+            ev.invokeMoveTouchAsMouse()
+            PointerInput.handleMouseButtonEvent(0, false)
+            isTouchActive = false
         }, false)
+
         canvas.addEventListener("touchcancel", { ev ->
             ev.preventDefault()
-            val changedTouches = (ev as TouchEvent).changedTouches
-            for (i in 0 until changedTouches.length) {
-                val touch = changedTouches.item(i)
-                PointerInput.handleTouchCancel(touch.identifier)
-            }
+            isTouchActive = false
+            ev.invokeMoveTouchAsMouse()
+            PointerInput.handleMouseButtonEvent(0, false)
+            PointerInput.handleMouseExit()
+            isTouchActive = false
         }, false)
+
         canvas.addEventListener("touchmove", { ev ->
             ev.preventDefault()
-            val changedTouches = (ev as TouchEvent).changedTouches
-            for (i in 0 until changedTouches.length) {
-                val touch = changedTouches.item(i)
-                PointerInput.handleTouchMove(touch.identifier, touch.elementX, touch.elementY)
+            ev.asTouchEvent()?.apply {
+                if (changedTouches.length == 1) {
+                    ev.invokeMoveTouchAsMouse()
+                    if(!isTouchActive){
+                        PointerInput.handleMouseButtonEvent(0, true)
+                        isTouchActive = true
+                    }
+                }
             }
         }, false)
 
