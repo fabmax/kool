@@ -34,7 +34,7 @@ data class KoolConfigJs(
         """
 
         val DEFAULT_MSDF_FONT_INFO: MsdfFontInfo by lazy {
-            val meta = Json.Default.decodeFromString<MsdfMeta>(DEFAULT_META_JSON)
+            val meta = Json.Default.decodeFromString(MsdfMeta.serializer(), DEFAULT_META_JSON)
             MsdfFontInfo(meta, "fonts/font-roboto-regular.png")
         }
     }

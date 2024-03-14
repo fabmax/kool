@@ -55,7 +55,7 @@ data class KoolConfigJvm(
             KoolConfigJvm::class.java.classLoader
                 .getResourceAsStream("fonts/font-roboto-regular.json").use {
                     checkNotNull(it) { "Failed to load \"fonts/font-roboto-regular.json\" from resources" }
-                    val meta = Json.Default.decodeFromString<MsdfMeta>(it.readAllBytes().decodeToString())
+                    val meta = Json.Default.decodeFromString(MsdfMeta.serializer(), it.readAllBytes().decodeToString())
                     MsdfFontInfo(meta, "fonts/font-roboto-regular.png")
                 }
         }

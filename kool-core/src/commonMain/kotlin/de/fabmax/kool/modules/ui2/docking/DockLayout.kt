@@ -7,7 +7,6 @@ import de.fabmax.kool.modules.ui2.Grow
 import de.fabmax.kool.util.logE
 import de.fabmax.kool.util.toBuffer
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -66,7 +65,7 @@ class DockLayout(val nodes: List<Node>) {
             val data = KeyValueStore.load(key)?.toArray()?.decodeToString()
             if (data != null) {
                 try {
-                    return Json.decodeFromString<DockLayout>(data).restoreLayout(target, itemProvider)
+                    return Json.Default.decodeFromString(serializer(), data).restoreLayout(target, itemProvider)
                 } catch (e: Exception) {
                     logE { "Failed to load layout: $e" }
                 }

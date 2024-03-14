@@ -28,7 +28,7 @@ object JvmKeyValueStore : PlatformKeyValueStore {
         val persistentKvStorage = File(storageDir, KEY_VALUE_STORAGE_NAME)
         if (persistentKvStorage.canRead()) {
             try {
-                val kvStore = Json.decodeFromString<KeyValueStore>(persistentKvStorage.readText())
+                val kvStore = Json.Default.decodeFromString(KeyValueStore.serializer(), persistentKvStorage.readText())
                 kvStore.keyValues.forEach { (k, v) -> keyValueStore[k] = v }
             } catch (e: Exception) {
                 logE { "Failed loading key value store: $e" }

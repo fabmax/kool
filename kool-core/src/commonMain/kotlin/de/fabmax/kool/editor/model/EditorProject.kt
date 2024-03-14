@@ -7,7 +7,6 @@ import de.fabmax.kool.editor.data.ProjectData
 import de.fabmax.kool.editor.data.SceneNodeData
 import de.fabmax.kool.modules.ui2.mutableStateListOf
 import de.fabmax.kool.util.logE
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 class EditorProject(val projectData: ProjectData) {
@@ -123,7 +122,7 @@ class EditorProject(val projectData: ProjectData) {
         suspend fun loadFromAssets(path: String = "kool-project.json"): EditorProject? {
             return try {
                 val json = Assets.loadBlobAsset(path).toArray().decodeToString()
-                val projectData: ProjectData = Json.decodeFromString(json)
+                val projectData = Json.Default.decodeFromString(ProjectData.serializer(), json)
                 EditorProject(projectData)
             } catch (e: Exception) {
                 null
